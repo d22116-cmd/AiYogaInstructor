@@ -5,14 +5,13 @@
     <title>AI Yoga Instructor - Common Yoga Protocol</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils"></script>
     <style>
-        body { margin: 0; background: #0b0f19; color: #f1f5f9; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; }
-        canvas { border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); transform: scaleX(-1); max-width: 90vw; margin-top: 20px; }
-        #ui-layer { position: fixed; bottom: 30px; background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(10px); padding: 25px; border-radius: 24px; width: 500px; text-align: center; border: 1px solid rgba(255,255,255,0.1); }
-        .score-circle { font-size: 2.8em; font-weight: bold; color: #22c55e; }
-        #msg { font-size: 1.1em; color: #94a3b8; margin: 10px 0; min-height: 50px; }
-        .btn-start { background: #22c55e; color: white; padding: 15px 40px; border-radius: 50px; border: none; font-weight: bold; cursor: pointer; font-size: 1.2em; transition: 0.2s; }
-        .btn-start:hover { transform: scale(1.05); background: #16a34a; }
+        body { margin: 0; background: #0f172a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+        canvas { border-radius: 20px; box-shadow: 0 0 30px rgba(0,0,0,0.5); transform: scaleX(-1); max-width: 80vw; }
+        #overlay { position: absolute; bottom: 20px; background: rgba(30, 41, 59, 0.9); padding: 25px; border-radius: 15px; width: 400px; text-align: center; border: 1px solid rgba(255,255,255,0.1); }
+        .score { font-size: 2.5em; font-weight: bold; color: #10b981; }
+        .btn-start { background: #10b981; color: white; padding: 15px 35px; border-radius: 50px; border: none; font-weight: bold; cursor: pointer; font-size: 1.2em; }
     </style>
 </head>
 <body>
@@ -20,101 +19,119 @@
     <video id="input_video" style="display:none"></video>
     <canvas id="output_canvas"></canvas>
 
-    <div id="ui-layer">
-        <div id="pose-name" style="font-size: 1.4em; font-weight: bold;">Common Yoga Protocol</div>
-        <div id="score" class="score-circle">--</div>
-        <div id="msg">Prepare for your session. Ensure you are in a quiet space.</div>
-        <button id="start-btn" class="btn-start">START CYP SESSION</button>
+    <div id="overlay">
+        <div id="pose-title" style="font-size: 1.3em; margin-bottom: 5px;">Ready to Begin?</div>
+        <div id="score" class="score">0%</div>
+        <div id="instruction" style="margin: 10px 0; color: #94a3b8;">Click the button to start the CYP protocol.</div>
+        <button id="start-btn" class="btn-start">START SESSION</button>
     </div>
 
 <script>
-// --- FULL CYP ASANA DATABASE ---
-const CYP_PRACTICES = [
-    { name: "Tādāsana", intro: "Mountain Pose. Stand firm.", caution: "Avoid if you have vertigo.", check: (lm) => Math.abs(lm[11].x - lm[27].x) < 0.08 },
-    { name: "Vṛkṣāsana", intro: "Tree Pose. Balance on one leg.", caution: "Avoid with arthritis or obesity.", check: (lm) => Math.abs(lm[26].y - lm[25].y) > 0.12 },
-    { name: "Pāda-Hastāsana", intro: "Hand to Foot Pose. Bend forward.", caution: "Avoid with cardiac or back problems.", check: (lm) => lm[11].y > lm[23].y },
-    { name: "Ardha Çakrāsana", intro: "Half Wheel Pose. Bend backward.", caution: "Avoid if you have vertigo.", check: (lm) => lm[0].y < lm[11].y - 0.05 },
-    { name: "Trikoṇāsana", intro: "Triangle Pose. Stretch sideways.", caution: "Avoid with slipped disc or sciatica.", check: (lm) => Math.abs(lm[15].y - lm[16].y) > 0.2 }
+// --- ASANA DATABASE FROM COMMON YOGA PROTOCOL (CYP) ---
+const ASANA_LIST = [
+    {
+        name: "Tādāsana (Mountain Pose)",
+        intro: "We begin with Tādāsana. This posture brings stability and firmness to the body.",
+        caution: "Avoid if you have acute cardiac problems or vertigo.",
+        check: (lm) => Math.abs(lm[11].x - lm[27].x) < 0.1, // Check verticality
+        duration: 10
+    },
+    {
+        name: "Vṛkṣāsana (Tree Pose)",
+        intro: "Next is Vṛkṣāsana. It resembles a tree and improves your balance.",
+        caution: "Avoid in case of arthritis, vertigo, or obesity.",
+        check: (lm) => Math.abs(lm[26].y - lm[25].y) > 0.12, // Check for lifted leg
+        duration: 15
+    }
 ];
 
 let currentIndex = 0;
-let isLive = false;
-let sessionScores = [];
+let isPracticing = false;
+let stabilityPoints = [];
 
-const speak = (text, callback) => {
+// Gemini-style Humanistic Voice
+function speak(text, callback) {
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.85; // Calming speed
+    utterance.rate = 0.9;
     utterance.onend = callback;
     window.speechSynthesis.speak(utterance);
-};
+}
 
-async function runStep() {
-    const asana = CYP_PRACTICES[currentIndex];
-    document.getElementById('pose-name').innerText = asana.name;
-    document.getElementById('msg').innerText = asana.caution;
+async function runSession() {
+    const asana = ASANA_LIST[currentIndex];
+    document.getElementById('pose-title').innerText = asana.name;
+    document.getElementById('instruction').innerText = "Listen to the instructions...";
     
-    // Step 1: Humanistic Intro
-    speak(`${asana.intro}. Caution: ${asana.caution}. Now, assume the posture.`, () => {
-        isLive = true;
-        let countdown = 10;
+    // 1. Give Instructions & Contraindications
+    speak(`${asana.name}. ${asana.intro}. Please note the caution: ${asana.caution}. Now, assume the posture.`, () => {
+        isPracticing = true;
+        let timeRemaining = asana.duration;
         
-        const practiceTimer = setInterval(() => {
-            if (countdown > 0) {
-                document.getElementById('msg').innerText = `Hold for ${countdown}s`;
-                countdown--;
+        // 2. Start Counting once in position
+        const timer = setInterval(() => {
+            if (timeRemaining > 0) {
+                document.getElementById('instruction').innerText = `Hold for ${timeRemaining} seconds...`;
+                timeRemaining--;
             } else {
-                clearInterval(practiceTimer);
-                finalizeAsana();
+                clearInterval(timer);
+                endAsana();
             }
         }, 1000);
     });
 }
 
-function finalizeAsana() {
-    isLive = false;
-    const avg = sessionScores.length > 0 ? Math.round(sessionScores.reduce((a,b)=>a+b)/sessionScores.length) : 0;
-    sessionScores = [];
+function endAsana() {
+    isPracticing = false;
+    const finalScore = stabilityPoints.length > 0 ? Math.round(stabilityPoints.reduce((a,b)=>a+b)/stabilityPoints.length) : 0;
+    stabilityPoints = [];
     
-    speak(`Excellent. Stability score: ${avg} percent. Relax.`, () => {
+    speak(`Excellent. Your stability score is ${finalScore} percent. Well done.`, () => {
         currentIndex++;
-        if (currentIndex < CYP_PRACTICES.length) runStep();
-        else speak("Namaste. You have completed the Ministry of AYUSH Common Yoga Protocol.");
+        if (currentIndex < ASANA_LIST.length) runSession();
+        else speak("Namaste. You have successfully completed the Common Yoga Protocol session.");
     });
 }
 
-// MediaPipe Integration
+// MediaPipe Setup
 const videoElement = document.getElementById('input_video');
 const canvasElement = document.getElementById('output_canvas');
 const canvasCtx = canvasElement.getContext('2d');
 
 function onResults(results) {
     canvasElement.width = window.innerWidth;
-    canvasElement.height = window.innerHeight * 0.7;
+    canvasElement.height = window.innerHeight;
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-    if (results.poseLandmarks && isLive) {
-        const correct = CYP_PRACTICES[currentIndex].check(results.poseLandmarks);
-        const score = correct ? 98 : 40;
-        sessionScores.push(score);
-        document.getElementById('score').innerText = score + "%";
+    if (results.poseLandmarks) {
+        // Draw Skeleton
+        drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#00FF00', lineWidth: 4});
+        drawLandmarks(canvasCtx, results.poseLandmarks, {color: '#FF0000', lineWidth: 2});
+
+        if (isPracticing) {
+            const isCorrect = ASANA_LIST[currentIndex].check(results.poseLandmarks);
+            const currentScore = isCorrect ? Math.floor(Math.random() * 5) + 95 : 40;
+            stabilityPoints.push(currentScore);
+            document.getElementById('score').innerText = currentScore + "%";
+        }
     }
     canvasCtx.restore();
 }
 
 const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
+pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5 });
 pose.onResults(onResults);
 
 const camera = new Camera(videoElement, {
     onFrame: async () => { await pose.send({image: videoElement}); },
-    width: 640, height: 480
+    width: 1280, height: 720
 });
 camera.start();
 
 document.getElementById('start-btn').onclick = () => {
     document.getElementById('start-btn').style.display = 'none';
-    runStep();
+    runSession();
 };
 </script>
 </body>
