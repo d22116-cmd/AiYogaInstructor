@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Yoga Instructor - Vrikshasana</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f0f4f8; margin: 0; overflow: hidden; }
+        #container { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        canvas { position: absolute; top: 0; left: 0; transform: scaleX(-1); } /* Mirror effect */
+        video { display: none; }
+        #ui-overlay { position: absolute; bottom: 20px; background: rgba(255, 255, 255, 0.8); padding: 20px; border-radius: 15px; width: 300px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); z-index: 10; }
+        .score-box { font-size: 24px; font-weight: bold; color: #2c3e50; }
+        .feedback { color: #e67e22; margin-top: 10px; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <video id="input_video"></video>
+    <canvas id="output_canvas"></canvas>
+    
+    <div id="ui-overlay">
+        <div class="score-box">Stability Score: <span id="score">0</span>%</div>
+        <div id="pose-name" style="font-weight: bold; color: #27ae60;">Pose: Detecting...</div>
+        <div class="feedback" id="feedback">Waiting for you to stand in frame...</div>
+    </div>
+</div>
+
+<script>
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const feedbackEl = document.getElementById('feedback');
+
+    // AI Voice Function
+    function speak(text) {
+        if (window.speechSynthesis.speaking) return;
+        const utterance = new window.SpeechSynthesisUtterance(text);
+        utterance.pitch = 1.1; 
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // Logic for Vrikshasana (Tree Pose)
+    function analyzeTreePose(landmarks) {
+        // Key joints: Hips (23, 24), Knees (25, 26), Ankles (27, 28)
+        const leftKneeY = landmarks[25].y;
+        const leftAnkleY = landmarks[27].y;
+        const rightKneeY = landmarks[26].y;
+        const rightAnkleY = landmarks[28].y;
+
+        let stability = 0;
+        let message = "Keep your back straight.";
+
+        // Basic Detection: Is one foot significantly higher than the other?
+        const kneeDiff = Math.abs(leftKneeY - rightKneeY);
+        
+        if (kneeDiff > 0.1) {
+            stability = 85;
+            message = "Great! Hold your balance.";
+            if (stability > 80) speak("Excellent stability. Hold for ten seconds.");
+        } else {
+            stability = 30;
+            message = "Lift one foot and place it on your inner thigh.";
+        }
+
+        scoreEl.innerText = Math.round(stability);
+        feedbackEl.innerText = message;
+    }
+
+    function onResults(results) {
+        // Set canvas size to match window
+        canvasElement.width = window.innerWidth;
+        canvasElement.height = window.innerHeight;
+
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        
+        // Draw video frame
+        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+        if (results.poseLandmarks) {
+            // Draw skeleton
+            drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#00FF00', lineWidth: 4});
+            drawLandmarks(canvasCtx, results.poseLandmarks, {color: '#FF0000', lineWidth: 2});
+            
+            // Run Analysis
+            analyzeTreePose(results.poseLandmarks);
+        }
+        canvasCtx.restore();
+    }
+
+    const pose = new Pose({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+    });
+
+    pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+
+    pose.onResults(onResults);
+
+    const camera = new Camera(videoElement, {
+        onFrame: async () => {
+            await pose.send({image: videoElement});
+        },
+        width: 1280,
+        height: 720
+    });
+    camera.start();
+
+    // Initial Greeting
+    speak("Namaste. I am your AI Yoga Instructor. Please stand in front of the camera to begin.");
+</script>
+
+</body>
+</html>
