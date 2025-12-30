@@ -1,34 +1,23 @@
-# AI Yoga Instructor: Ministry of AYUSH (CYP) Edition 🧘‍♂️🇮🇳
+# AI Yoga Instructor: Common Yoga Protocol (CYP) Edition 🧘‍♂️🇮🇳
 
-A professional, real-time AI Yoga platform that implements the **Common Yoga Protocol (CYP)** as defined by the Ministry of AYUSH, Government of India. This application uses computer vision to provide a humanistic, guided yoga experience.
+This is a real-time AI-powered Yoga Instructor built using **MediaPipe** and **Web Speech API**. [cite_start]It is designed to follow the official **Ministry of AYUSH** Common Yoga Protocol[cite: 1, 377].
 
-## ✨ Features
-* [cite_start]**CYP Compliance:** Guided sequences including Standing, Sitting, and Lying postures[cite: 6].
-* [cite_start]**Humanistic AI Voice:** Emulates a real instructor by providing intros, contraindications, and real-time encouragement [cite: 74-75].
-* [cite_start]**Safety First:** Voice alerts for contraindications (e.g., vertigo, cardiac issues) before every practice[cite: 80, 158].
-* [cite_start]**Precision Monitoring:** Uses MediaPipe Pose to calculate anatomical angles and stability scores[cite: 51].
+## 🛠️ Fixes Included
+* **Camera Access:** Added a "Start Session" button to comply with browser privacy policies.
+* **Audible Counting:** Integrated counting logic synchronized with a humanistic AI voice.
+* **Pose Estimation:** Fixed CDN links for real-time skeleton tracking.
+* [cite_start]**Instructional Flow:** Added contraindications and practice steps as specified in the CYP document[cite: 80, 138, 147].
 
-## 📋 Practices Included (CYP Sequence)
-The platform monitors and scores the following practices based on official guidelines:
+## 📋 How to Use
+1.  Upload `index.html` and this `README.md` to your GitHub repo.
+2.  Enable **GitHub Pages** in Settings.
+3.  Launch the URL, grant camera permissions, and click **"START SESSION"**.
+4.  Stand back so your whole body is visible to the camera.
 
-1.  [cite_start]**Standing Postures:** Tādāsana (Stability), Vṛkṣāsana (Balance), Pāda-Hastāsana (Flexibility), Ardha Çakrāsana, and Trikoṇāsana[cite: 131, 139, 148, 160, 168].
-2.  [cite_start]**Sitting Postures:** Bhadrāsana, Vajrāsana, and Vakrāsana[cite: 180, 194, 201].
-3.  [cite_start]**Lying Postures:** Bhujaṅgāsana (Cobra), Śalabhāsana, and Pavanamuktāsana[cite: 212, 222, 245].
-
-## 🛠️ Technical Architecture
-* **Vision Engine:** MediaPipe Pose (33 body landmarks).
-* **Logic:** Custom JavaScript "State Machine" to handle the Yoga Practice Lifecycle:
-    1.  [cite_start]*Instruction & Caution* [cite: 80]
-    2.  [cite_start]*Position Setup* [cite: 75]
-    3.  [cite_start]*Guided Holding & Counting* [cite: 135, 153]
-    4.  [cite_start]*Performance Scoring* [cite: 51]
-* **Interface:** HTML5/CSS3 with Web Speech API for the "Gemini-style" voice.
-
-## 🚀 Getting Started
-1.  Open `index.html` in a browser.
-2.  Click **"START SESSION"** to initialize the voice engine.
-3.  Ensure your full body is visible to the camera.
-4.  Follow the voice prompts for a 100% hands-free practice.
+## 📐 AI Logic
+The system monitors 33 body landmarks to ensure:
+* [cite_start]**Tādāsana:** Vertical alignment of the shoulders and ankles [cite: 131-133].
+* [cite_start]**Vṛkṣāsana:** Accurate leg lift and balance holding [cite: 141-143].
 
 ## ⚠️ Disclaimer
-[cite_start]This protocol is intended to create general awareness and is not a substitute for medical advice[cite: 398, 399]. [cite_start]Always consult a physician if you have chronic pain or cardiac conditions before practicing[cite: 72].
+[cite_start]Information provided in this protocol is for general awareness and is not a substitute for medical advice[cite: 3, 399]. [cite_start]Consult a physician before practicing if you have chronic pain or cardiac issues[cite: 72].
