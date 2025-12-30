@@ -2,132 +2,1862 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>AI Yoga - Common Yoga Protocol</title>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Yoga Instructor - CYP Edition</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466124/drawing_utils.js"></script>
     <style>
-        body { margin: 0; background: #020617; color: white; font-family: sans-serif; overflow: hidden; }
-        #app { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-        #ui { position: absolute; bottom: 30px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px); padding: 25px; border-radius: 20px; width: 400px; text-align: center; z-index: 10; border: 1px solid rgba(255,255,255,0.1); }
-        .score { font-size: 3em; font-weight: 800; color: #10b981; }
-        button { background: #10b981; border: none; padding: 18px 45px; border-radius: 50px; font-weight: bold; cursor: pointer; color: white; font-size: 1.2em; transition: 0.3s; }
-        #msg { color: #94a3b8; margin: 15px 0; font-size: 1.1em; height: 50px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .voice-toggle {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #00d9ff, #0099ff);
+            border: none;
+            border-radius: 25px;
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .voice-toggle:hover { transform: scale(1.05); }
+        .voice-toggle.off { background: #444; }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 25px;
+            padding: 25px;
+        }
+        
+        .video-section {
+            position: relative;
+            background: #000;
+            border-radius: 20px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+        }
+        
+        #videoElement, #canvasElement {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        #videoElement { transform: scaleX(-1); }
+        #canvasElement { transform: scaleX(-1); }
+        
+        /* Detection Status Overlay */
+        .detection-status {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 25px;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s;
+        }
+        
+        .detection-status.detected {
+            background: rgba(0, 200, 100, 0.9);
+            box-shadow: 0 4px 20px rgba(0, 200, 100, 0.4);
+        }
+        
+        .detection-status.not-detected {
+            background: rgba(220, 50, 50, 0.9);
+            box-shadow: 0 4px 20px rgba(220, 50, 50, 0.4);
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #fff;
+        }
+        
+        .detected .status-dot {
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+        
+        /* Pose Info Overlay */
+        .pose-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 25px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.9));
+        }
+        
+        .pose-name {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .pose-sanskrit {
+            font-size: 1rem;
+            color: #00d9ff;
+            margin-bottom: 5px;
+        }
+        
+        .timer-bar {
+            height: 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+        
+        .timer-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            border-radius: 3px;
+            transition: width 0.1s linear;
+        }
+        
+        /* Score Display */
+        .score-display {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            text-align: center;
+            z-index: 50;
+        }
+        
+        .score-circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: conic-gradient(#00ff88 0deg, #00ff88 0deg, rgba(255,255,255,0.1) 0deg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all 0.3s;
+        }
+        
+        .score-circle.no-detection {
+            background: rgba(100,100,100,0.5);
+        }
+        
+        .score-inner {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .score-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #00ff88;
+        }
+        
+        .score-label {
+            font-size: 0.7rem;
+            color: #888;
+        }
+        
+        /* Side Panel */
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .panel-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .card-title {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        /* Vitals */
+        .vitals-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .vital-item {
+            text-align: center;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            transition: opacity 0.3s;
+        }
+        
+        .vital-item.no-data {
+            opacity: 0.4;
+        }
+        
+        .vital-icon {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+        
+        .vital-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #00d9ff;
+        }
+        
+        .vital-label {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 4px;
+        }
+        
+        /* Instructions */
+        .instructions {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #ccc;
+        }
+        
+        .contraindication {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(255, 150, 0, 0.15);
+            border-left: 3px solid #ff9500;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.85rem;
+            color: #ffb84d;
+        }
+        
+        /* Feedback Toast */
+        .feedback-toast {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 25px;
+            background: rgba(255, 200, 0, 0.95);
+            color: #000;
+            border-radius: 30px;
+            font-weight: 600;
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 100;
+            max-width: 90%;
+            text-align: center;
+        }
+        
+        .feedback-toast.visible { opacity: 1; }
+        .feedback-toast.safety {
+            background: rgba(255, 50, 50, 0.95);
+            color: #fff;
+        }
+        
+        /* Speaking Indicator */
+        .speaking-indicator {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 15px 25px;
+            background: linear-gradient(135deg, #00d9ff, #0099ff);
+            border-radius: 30px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 5px 30px rgba(0, 200, 255, 0.4);
+            z-index: 1000;
+        }
+        
+        .speaking-indicator.active { display: flex; }
+        
+        .sound-waves {
+            display: flex;
+            gap: 3px;
+            align-items: center;
+            height: 20px;
+        }
+        
+        .wave-bar {
+            width: 4px;
+            background: #fff;
+            border-radius: 2px;
+            animation: wave 0.8s ease-in-out infinite;
+        }
+        
+        .wave-bar:nth-child(1) { height: 8px; animation-delay: 0s; }
+        .wave-bar:nth-child(2) { height: 16px; animation-delay: 0.1s; }
+        .wave-bar:nth-child(3) { height: 12px; animation-delay: 0.2s; }
+        .wave-bar:nth-child(4) { height: 18px; animation-delay: 0.3s; }
+        .wave-bar:nth-child(5) { height: 10px; animation-delay: 0.4s; }
+        
+        @keyframes wave {
+            0%, 100% { transform: scaleY(0.5); }
+            50% { transform: scaleY(1); }
+        }
+        
+        /* Progress Steps */
+        .progress-section {
+            margin-top: auto;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            transition: width 0.5s;
+        }
+        
+        .progress-text {
+            margin-top: 10px;
+            font-size: 0.85rem;
+            color: #888;
+            text-align: center;
+        }
+        
+        /* Start Screen */
+        .start-screen {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #1a1a2e, #0f3460);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .start-screen h1 {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .start-screen p {
+            font-size: 1.2rem;
+            color: #888;
+            margin-bottom: 40px;
+            max-width: 600px;
+        }
+        
+        .start-btn {
+            padding: 18px 50px;
+            font-size: 1.2rem;
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+            border: none;
+            border-radius: 50px;
+            color: #000;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .start-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 40px rgba(0, 217, 255, 0.4);
+        }
+        
+        .start-screen.hidden { display: none; }
+        
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+        }
+        
+        .loading-overlay.hidden { display: none; }
+        
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #00d9ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .loading-text {
+            margin-top: 20px;
+            color: #888;
+        }
+        
+        /* Responsive */
+        @media (max-width: 1000px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
-
-<div id="app">
-    <video id="input_video" style="display:none" playsinline></video>
-    <canvas id="output_canvas"></canvas>
-
-    <div id="ui">
-        <div id="pose-name" style="font-weight: bold; font-size: 1.5em;">CYP Yoga Guide</div>
-        <div id="score" class="score">--</div>
-        <p id="msg">Ensure you are in a bright room and stand 6-8 feet away.</p>
-        <button id="start-btn">START SESSION</button>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text">Initializing AI Pose Detection...</div>
     </div>
-</div>
+    
+    <!-- Start Screen -->
+    <div class="start-screen" id="startScreen">
+        <h1>🧘 AI Yoga Instructor</h1>
+        <p>Experience the Common Yoga Protocol with real-time AI guidance, pose detection, and voice instructions.</p>
+        <button class="start-btn" id="startBtn">Begin Practice</button>
+    </div>
+    
+    <header>
+        <div class="logo">🧘 AI Yoga Instructor</div>
+        <button class="voice-toggle" id="voiceToggle">🔊 Voice ON</button>
+    </header>
+    
+    <div class="main-content">
+        <div class="video-section">
+            <video id="videoElement" playsinline></video>
+            <canvas id="canvasElement"></canvas>
+            
+            <!-- Detection Status -->
+            <div class="detection-status not-detected" id="detectionStatus">
+                <div class="status-dot"></div>
+                <span id="detectionText">No Person Detected</span>
+            </div>
+            
+            <!-- Score Display -->
+            <div class="score-display">
+                <div class="score-circle no-detection" id="scoreCircle">
+                    <div class="score-inner">
+                        <div class="score-value" id="scoreValue">--</div>
+                        <div class="score-label">SCORE</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Feedback Toast -->
+            <div class="feedback-toast" id="feedbackToast"></div>
+            
+            <!-- Pose Info Overlay -->
+            <div class="pose-overlay">
+                <div class="pose-sanskrit" id="poseSanskrit">Prārthana</div>
+                <div class="pose-name" id="poseName">Opening Prayer</div>
+                <div class="timer-bar">
+                    <div class="timer-progress" id="timerProgress"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="side-panel">
+            <!-- Vitals Card -->
+            <div class="panel-card">
+                <div class="card-title">Live Vitals</div>
+                <div class="vitals-grid">
+                    <div class="vital-item no-data" id="hrCard">
+                        <div class="vital-icon">❤️</div>
+                        <div class="vital-value" id="heartRate">--</div>
+                        <div class="vital-label">Heart Rate</div>
+                    </div>
+                    <div class="vital-item no-data" id="brCard">
+                        <div class="vital-icon">🌬️</div>
+                        <div class="vital-value" id="breathRate">--</div>
+                        <div class="vital-label">Breath/min</div>
+                    </div>
+                    <div class="vital-item no-data" id="stabilityCard">
+                        <div class="vital-icon">⚖️</div>
+                        <div class="vital-value" id="stability">--</div>
+                        <div class="vital-label">Stability</div>
+                    </div>
+                    <div class="vital-item" id="timeCard">
+                        <div class="vital-icon">⏱️</div>
+                        <div class="vital-value" id="holdTime">0s</div>
+                        <div class="vital-label">Hold Time</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Instructions Card -->
+            <div class="panel-card">
+                <div class="card-title">Instructions</div>
+                <div class="instructions" id="instructions">
+                    Begin with a prayer to create a conducive environment for practice.
+                </div>
+                <div class="contraindication" id="contraindication" style="display:none;"></div>
+            </div>
+            
+            <!-- Progress Card -->
+            <div class="panel-card progress-section">
+                <div class="card-title">Session Progress</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="sessionProgress" style="width: 0%"></div>
+                </div>
+                <div class="progress-text" id="progressText">Practice 1 of 20</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Speaking Indicator -->
+    <div class="speaking-indicator" id="speakingIndicator">
+        <div class="sound-waves">
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+        </div>
+        <span>Speaking...</span>
+    </div>
 
 <script>
-const videoElement = document.getElementById('input_video');
-const canvasElement = document.getElementById('output_canvas');
-const canvasCtx = canvasElement.getContext('2d');
-const scoreEl = document.getElementById('score');
-const msgEl = document.getElementById('msg');
-const startBtn = document.getElementById('start-btn');
-
-const CYP_ASANAS = [
-    { name: "Tādāsana", intro: "Let's begin with Tādāsana. Focus on a point in front of you.", caution: "Avoid if you have acute migraine or low blood pressure.", duration: 10 },
-    { name: "Vṛkṣāsana", intro: "Next is Vṛkṣāsana. Lift your leg and place the foot on your thigh.", caution: "Avoid if you have vertigo.", duration: 15 }
-];
-
-let currentIndex = 0;
-let isPracticing = false;
-
-// Humanistic Voice Engine
-function speak(text, callback) {
-    window.speechSynthesis.cancel(); // Reset audio
-    const speech = new SpeechSynthesisUtterance(text);
-    speech.rate = 0.85; 
-    speech.onend = callback;
-    window.speechSynthesis.speak(speech);
-}
-
-// Logic to check "Vrikshasana"
-function checkPose(landmarks) {
-    // Basic stability: check if one ankle (27/28) is significantly higher than the other
-    const leftAnkleY = landmarks[27].y;
-    const rightAnkleY = landmarks[28].y;
-    return Math.abs(leftAnkleY - rightAnkleY) > 0.1;
-}
-
-async function runSession() {
-    const asana = CYP_ASANAS[currentIndex];
-    document.getElementById('pose-name').innerText = asana.name;
+// ============================================
+// VOICE GUIDANCE SYSTEM
+// ============================================
+class VoiceGuide {
+    constructor() {
+        this.synth = window.speechSynthesis;
+        this.enabled = true;
+        this.speaking = false;
+        this.voice = null;
+        this.initVoice();
+    }
     
-    speak(`${asana.name}. ${asana.intro}. Caution: ${asana.caution}. Stand in position now.`, () => {
-        isPracticing = true;
-        let count = asana.duration;
-        const timer = setInterval(() => {
-            if (count > 0) {
-                msgEl.innerText = `Holding for ${count}s...`;
-                count--;
-            } else {
-                clearInterval(timer);
-                isPracticing = false;
-                speak(`Excellent. Moving to the next pose.`, () => {
-                    currentIndex++;
-                    if (currentIndex < CYP_ASANAS.length) runSession();
-                    else speak("Namaste. Protocol complete.");
-                });
+    initVoice() {
+        const loadVoices = () => {
+            const voices = this.synth.getVoices();
+            // Prefer Indian English, then UK, then US
+            this.voice = voices.find(v => v.lang === 'en-IN') ||
+                        voices.find(v => v.lang === 'en-GB') ||
+                        voices.find(v => v.lang === 'en-US') ||
+                        voices[0];
+            console.log('Voice selected:', this.voice?.name);
+        };
+        
+        if (this.synth.getVoices().length) loadVoices();
+        this.synth.onvoiceschanged = loadVoices;
+    }
+    
+    speak(text, priority = false) {
+        if (!this.enabled || !text) return;
+        
+        if (priority) this.synth.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.voice = this.voice;
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        
+        utterance.onstart = () => {
+            this.speaking = true;
+            document.getElementById('speakingIndicator').classList.add('active');
+        };
+        
+        utterance.onend = () => {
+            this.speaking = false;
+            document.getElementById('speakingIndicator').classList.remove('active');
+        };
+        
+        this.synth.speak(utterance);
+    }
+    
+    stop() {
+        this.synth.cancel();
+        this.speaking = false;
+        document.getElementById('speakingIndicator').classList.remove('active');
+    }
+    
+    toggle() {
+        this.enabled = !this.enabled;
+        if (!this.enabled) this.stop();
+        return this.enabled;
+    }
+}
+
+// ============================================
+// REAL POSE ANALYZER - STRICT VALIDATION
+// ============================================
+class PoseAnalyzer {
+    constructor() {
+        this.VISIBILITY_THRESHOLD = 0.5;
+        this.personDetected = false;
+        this.lastValidDetection = 0;
+    }
+    
+    // Check if person is ACTUALLY in frame with sufficient visibility
+    checkPersonDetected(landmarks) {
+        if (!landmarks || landmarks.length === 0) {
+            this.personDetected = false;
+            return false;
+        }
+        
+        // Key landmarks: shoulders (11, 12), hips (23, 24)
+        const keyIndices = [11, 12, 23, 24];
+        let visibleCount = 0;
+        
+        for (const idx of keyIndices) {
+            if (landmarks[idx] && landmarks[idx].visibility > this.VISIBILITY_THRESHOLD) {
+                visibleCount++;
             }
-        }, 1000);
-    });
+        }
+        
+        // Need at least 3 of 4 key landmarks visible
+        this.personDetected = visibleCount >= 3;
+        
+        if (this.personDetected) {
+            this.lastValidDetection = Date.now();
+        }
+        
+        return this.personDetected;
+    }
+    
+    // Calculate angle between three points
+    calculateAngle(a, b, c) {
+        if (!a || !b || !c) return null;
+        if (a.visibility < this.VISIBILITY_THRESHOLD || 
+            b.visibility < this.VISIBILITY_THRESHOLD || 
+            c.visibility < this.VISIBILITY_THRESHOLD) {
+            return null;
+        }
+        
+        const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+        let angle = Math.abs(radians * 180 / Math.PI);
+        if (angle > 180) angle = 360 - angle;
+        return angle;
+    }
+    
+    // Get landmark safely
+    getLandmark(landmarks, idx) {
+        const lm = landmarks[idx];
+        if (!lm || lm.visibility < this.VISIBILITY_THRESHOLD) return null;
+        return lm;
+    }
+    
+    // Analyze specific pose
+    analyzePose(landmarks, poseId) {
+        if (!this.checkPersonDetected(landmarks)) {
+            return { score: 0, feedback: "Stand in view of camera", isValid: false };
+        }
+        
+        const analyzers = {
+            'tadasana': () => this.analyzeTadasana(landmarks),
+            'vrikshasana': () => this.analyzeVrikshasana(landmarks),
+            'padahastasana': () => this.analyzePadahastasana(landmarks),
+            'ardhachakrasana': () => this.analyzeArdhachakrasana(landmarks),
+            'trikonasana': () => this.analyzeTrikonasana(landmarks),
+            'bhujangasana': () => this.analyzeBhujangasana(landmarks),
+            'shalabhasana': () => this.analyzeShalabhasana(landmarks),
+            'setubandasana': () => this.analyzeSetubandasana(landmarks),
+        };
+        
+        const analyzer = analyzers[poseId];
+        if (analyzer) {
+            return analyzer();
+        }
+        
+        // Default: check basic posture
+        return this.analyzeBasicPosture(landmarks);
+    }
+    
+    analyzeBasicPosture(landmarks) {
+        let score = 70;
+        let feedback = "Maintain steady posture";
+        
+        // Check shoulder alignment
+        const lShoulder = this.getLandmark(landmarks, 11);
+        const rShoulder = this.getLandmark(landmarks, 12);
+        
+        if (lShoulder && rShoulder) {
+            const shoulderDiff = Math.abs(lShoulder.y - rShoulder.y);
+            if (shoulderDiff < 0.03) {
+                score += 15;
+                feedback = "Good posture alignment";
+            } else if (shoulderDiff > 0.08) {
+                score -= 10;
+                feedback = "Keep shoulders level";
+            }
+        }
+        
+        return { score: Math.min(100, Math.max(0, score)), feedback, isValid: true };
+    }
+    
+    analyzeTadasana(landmarks) {
+        let score = 0;
+        let feedback = "";
+        
+        // Check verticality: shoulder-hip-ankle alignment
+        const shoulder = this.getLandmark(landmarks, 11);
+        const hip = this.getLandmark(landmarks, 23);
+        const ankle = this.getLandmark(landmarks, 27);
+        
+        if (!shoulder || !hip || !ankle) {
+            return { score: 0, feedback: "Full body must be visible", isValid: false };
+        }
+        
+        // Calculate vertical alignment
+        const xDeviation = Math.abs(shoulder.x - hip.x) + Math.abs(hip.x - ankle.x);
+        
+        if (xDeviation < 0.05) {
+            score = 90;
+            feedback = "Excellent vertical alignment!";
+        } else if (xDeviation < 0.1) {
+            score = 75;
+            feedback = "Good alignment, slight adjustment needed";
+        } else if (xDeviation < 0.15) {
+            score = 60;
+            feedback = "Stand straighter, align body vertically";
+        } else {
+            score = 40;
+            feedback = "Align shoulders over hips and ankles";
+        }
+        
+        // Check arms raised
+        const wrist = this.getLandmark(landmarks, 15);
+        if (wrist && wrist.y < shoulder.y) {
+            score += 10;
+        } else {
+            feedback = "Raise arms above head";
+        }
+        
+        return { score: Math.min(100, score), feedback, isValid: true };
+    }
+    
+    analyzeVrikshasana(landmarks) {
+        let score = 0;
+        let feedback = "";
+        
+        const lHip = this.getLandmark(landmarks, 23);
+        const rHip = this.getLandmark(landmarks, 24);
+        const lKnee = this.getLandmark(landmarks, 25);
+        const rKnee = this.getLandmark(landmarks, 26);
+        const lAnkle = this.getLandmark(landmarks, 27);
+        const rAnkle = this.getLandmark(landmarks, 28);
+        
+        if (!lHip || !rHip || !lKnee || !rKnee) {
+            return { score: 0, feedback: "Lower body must be visible", isValid: false };
+        }
+        
+        // Detect which leg is lifted
+        const leftLifted = lAnkle && rAnkle && lAnkle.y < rAnkle.y - 0.1;
+        const rightLifted = lAnkle && rAnkle && rAnkle.y < lAnkle.y - 0.1;
+        
+        if (!leftLifted && !rightLifted) {
+            return { score: 30, feedback: "Lift one foot to inner thigh", isValid: true };
+        }
+        
+        // Check for DANGEROUS knee placement
+        if (leftLifted) {
+            const footToKnee = Math.abs(lAnkle.y - rKnee.y);
+            const footToKneeX = Math.abs(lAnkle.x - rKnee.x);
+            if (footToKnee < 0.05 && footToKneeX < 0.08) {
+                return { 
+                    score: 0, 
+                    feedback: "⚠️ DANGER: Move foot to THIGH or CALF, NOT on knee joint!",
+                    isValid: true,
+                    isSafety: true
+                };
+            }
+        }
+        
+        if (rightLifted) {
+            const footToKnee = Math.abs(rAnkle.y - lKnee.y);
+            const footToKneeX = Math.abs(rAnkle.x - lKnee.x);
+            if (footToKnee < 0.05 && footToKneeX < 0.08) {
+                return { 
+                    score: 0, 
+                    feedback: "⚠️ DANGER: Move foot to THIGH or CALF, NOT on knee joint!",
+                    isValid: true,
+                    isSafety: true
+                };
+            }
+        }
+        
+        score = 75;
+        feedback = "Good tree pose! Keep balance steady";
+        
+        // Check arms raised
+        const shoulder = this.getLandmark(landmarks, 11);
+        const wrist = this.getLandmark(landmarks, 15);
+        if (wrist && shoulder && wrist.y < shoulder.y) {
+            score += 15;
+            feedback = "Excellent! Arms raised beautifully";
+        }
+        
+        return { score: Math.min(100, score), feedback, isValid: true };
+    }
+    
+    analyzePadahastasana(landmarks) {
+        const hip = this.getLandmark(landmarks, 23);
+        const shoulder = this.getLandmark(landmarks, 11);
+        const wrist = this.getLandmark(landmarks, 15);
+        const ankle = this.getLandmark(landmarks, 27);
+        
+        if (!hip || !shoulder) {
+            return { score: 0, feedback: "Upper body must be visible", isValid: false };
+        }
+        
+        // Check forward bend - shoulder should be lower than hip
+        if (shoulder.y > hip.y) {
+            let score = 60;
+            let feedback = "Good forward bend";
+            
+            // Check hands reaching feet
+            if (wrist && ankle) {
+                const handToFoot = Math.abs(wrist.y - ankle.y);
+                if (handToFoot < 0.1) {
+                    score = 95;
+                    feedback = "Excellent! Hands reaching feet";
+                } else if (handToFoot < 0.2) {
+                    score = 80;
+                    feedback = "Good! Reach a bit more toward feet";
+                }
+            }
+            
+            return { score, feedback, isValid: true };
+        }
+        
+        return { score: 40, feedback: "Bend forward from the hips", isValid: true };
+    }
+    
+    analyzeArdhachakrasana(landmarks) {
+        const hip = this.getLandmark(landmarks, 23);
+        const shoulder = this.getLandmark(landmarks, 11);
+        
+        if (!hip || !shoulder) {
+            return { score: 0, feedback: "Upper body must be visible", isValid: false };
+        }
+        
+        // Check backward bend - hip should be forward of shoulder
+        if (hip.x > shoulder.x + 0.05 || shoulder.y > hip.y - 0.1) {
+            return { score: 75, feedback: "Good backward bend! Keep hips forward", isValid: true };
+        }
+        
+        return { score: 50, feedback: "Gently bend backward, push hips forward", isValid: true };
+    }
+    
+    analyzeTrikonasana(landmarks) {
+        const lShoulder = this.getLandmark(landmarks, 11);
+        const rShoulder = this.getLandmark(landmarks, 12);
+        const lHip = this.getLandmark(landmarks, 23);
+        const rHip = this.getLandmark(landmarks, 24);
+        
+        if (!lShoulder || !rShoulder || !lHip || !rHip) {
+            return { score: 0, feedback: "Full torso must be visible", isValid: false };
+        }
+        
+        // Check lateral bend - shoulders should be at different heights
+        const shoulderTilt = Math.abs(lShoulder.y - rShoulder.y);
+        
+        if (shoulderTilt > 0.15) {
+            return { score: 85, feedback: "Excellent triangle form!", isValid: true };
+        } else if (shoulderTilt > 0.08) {
+            return { score: 70, feedback: "Good! Bend more to the side", isValid: true };
+        }
+        
+        return { score: 50, feedback: "Bend sideways, keep arms in line", isValid: true };
+    }
+    
+    analyzeBhujangasana(landmarks) {
+        const shoulder = this.getLandmark(landmarks, 11);
+        const hip = this.getLandmark(landmarks, 23);
+        const nose = this.getLandmark(landmarks, 0);
+        
+        if (!shoulder || !hip) {
+            return { score: 0, feedback: "Upper body must be visible", isValid: false };
+        }
+        
+        // In cobra, shoulders should be lifted (lower y value) and chest open
+        if (shoulder.y < hip.y && nose && nose.y < shoulder.y) {
+            return { score: 85, feedback: "Beautiful cobra! Keep chest lifted", isValid: true };
+        }
+        
+        return { score: 55, feedback: "Lift chest higher, look slightly upward", isValid: true };
+    }
+    
+    analyzeShalabhasana(landmarks) {
+        const hip = this.getLandmark(landmarks, 23);
+        const ankle = this.getLandmark(landmarks, 27);
+        
+        if (!hip || !ankle) {
+            return { score: 0, feedback: "Lower body must be visible", isValid: false };
+        }
+        
+        // Legs should be lifted (ankle y less than expected based on hip)
+        if (ankle.y < hip.y + 0.1) {
+            return { score: 80, feedback: "Good leg lift! Keep legs straight", isValid: true };
+        }
+        
+        return { score: 50, feedback: "Lift both legs higher", isValid: true };
+    }
+    
+    analyzeSetubandasana(landmarks) {
+        const shoulder = this.getLandmark(landmarks, 11);
+        const hip = this.getLandmark(landmarks, 23);
+        const knee = this.getLandmark(landmarks, 25);
+        
+        if (!shoulder || !hip || !knee) {
+            return { score: 0, feedback: "Full body must be visible", isValid: false };
+        }
+        
+        // Hip should be lifted above shoulder level (lower y value)
+        if (hip.y < shoulder.y) {
+            // Check hip-knee alignment
+            const angle = this.calculateAngle(shoulder, hip, knee);
+            if (angle && angle > 150) {
+                return { score: 90, feedback: "Excellent bridge! Hips lifted high", isValid: true };
+            }
+            return { score: 75, feedback: "Good bridge! Lift hips a bit more", isValid: true };
+        }
+        
+        return { score: 45, feedback: "Lift hips toward ceiling", isValid: true };
+    }
 }
 
-function onResults(results) {
-    // Set canvas dimensions to match browser window
-    canvasElement.width = window.innerWidth;
-    canvasElement.height = window.innerHeight;
-
-    canvasCtx.save();
-    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+// ============================================
+// REAL rPPG HEART RATE DETECTOR
+// ============================================
+class HeartRateDetector {
+    constructor() {
+        this.buffer = [];
+        this.bufferSize = 300; // 10 seconds at 30fps
+        this.lastHR = null;
+        this.isDetecting = false;
+        this.consecutiveFailures = 0;
+        this.FACE_VISIBILITY_THRESHOLD = 0.5;
+    }
     
-    // Draw the video frame to the canvas
-    canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-
-    if (results.poseLandmarks) {
-        // Draw the "Skeleton" overlay
-        drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#00FF00', lineWidth: 4});
-        drawLandmarks(canvasCtx, results.poseLandmarks, {color: '#FF0000', lineWidth: 2});
-
-        if (isPracticing) {
-            const isCorrect = checkPose(results.poseLandmarks);
-            scoreEl.innerText = isCorrect ? "95%" : "40%";
+    // Check if face is actually visible
+    checkFaceVisible(landmarks) {
+        if (!landmarks || landmarks.length === 0) {
+            this.isDetecting = false;
+            return false;
+        }
+        
+        // Check nose (0), left eye (2), right eye (5)
+        const nose = landmarks[0];
+        const leftEye = landmarks[2];
+        const rightEye = landmarks[5];
+        
+        if (!nose || !leftEye || !rightEye) {
+            this.isDetecting = false;
+            return false;
+        }
+        
+        const faceVisible = nose.visibility > this.FACE_VISIBILITY_THRESHOLD &&
+                           leftEye.visibility > this.FACE_VISIBILITY_THRESHOLD &&
+                           rightEye.visibility > this.FACE_VISIBILITY_THRESHOLD;
+        
+        this.isDetecting = faceVisible;
+        return faceVisible;
+    }
+    
+    // Extract forehead ROI and get green channel value
+    processFrame(videoElement, landmarks) {
+        if (!this.checkFaceVisible(landmarks)) {
+            this.consecutiveFailures++;
+            if (this.consecutiveFailures > 30) {
+                this.buffer = [];
+                this.lastHR = null;
+            }
+            return null;
+        }
+        
+        this.consecutiveFailures = 0;
+        
+        try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            ctx.drawImage(videoElement, 0, 0);
+            
+            // Get forehead region based on face landmarks
+            const nose = landmarks[0];
+            const leftEye = landmarks[2];
+            const rightEye = landmarks[5];
+            
+            // Forehead is above eyes
+            const foreheadX = (leftEye.x + rightEye.x) / 2 * canvas.width;
+            const foreheadY = (leftEye.y - 0.08) * canvas.height;
+            const roiWidth = Math.abs(rightEye.x - leftEye.x) * canvas.width * 0.8;
+            const roiHeight = roiWidth * 0.4;
+            
+            const imageData = ctx.getImageData(
+                Math.max(0, foreheadX - roiWidth/2),
+                Math.max(0, foreheadY - roiHeight/2),
+                roiWidth,
+                roiHeight
+            );
+            
+            // Extract green channel average (best for rPPG)
+            let greenSum = 0;
+            let pixelCount = 0;
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                greenSum += imageData.data[i + 1]; // Green channel
+                pixelCount++;
+            }
+            
+            const greenAvg = greenSum / pixelCount;
+            this.buffer.push({
+                value: greenAvg,
+                timestamp: Date.now()
+            });
+            
+            if (this.buffer.length > this.bufferSize) {
+                this.buffer.shift();
+            }
+            
+            // Need at least 3 seconds of data
+            if (this.buffer.length >= 90) {
+                return this.calculateHeartRate();
+            }
+            
+            return null;
+            
+        } catch (e) {
+            console.error('rPPG error:', e);
+            return null;
         }
     }
-    canvasCtx.restore();
+    
+    calculateHeartRate() {
+        if (this.buffer.length < 90) return null;
+        
+        // Detrend the signal
+        const values = this.buffer.map(b => b.value);
+        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+        const detrended = values.map(v => v - mean);
+        
+        // Simple bandpass using moving average difference (0.7-3.5 Hz = 42-210 BPM range)
+        const filtered = [];
+        const windowShort = 3;
+        const windowLong = 15;
+        
+        for (let i = windowLong; i < detrended.length; i++) {
+            const shortAvg = detrended.slice(i - windowShort, i).reduce((a, b) => a + b, 0) / windowShort;
+            const longAvg = detrended.slice(i - windowLong, i).reduce((a, b) => a + b, 0) / windowLong;
+            filtered.push(shortAvg - longAvg);
+        }
+        
+        // Find peaks
+        const peaks = [];
+        for (let i = 2; i < filtered.length - 2; i++) {
+            if (filtered[i] > filtered[i-1] && filtered[i] > filtered[i-2] &&
+                filtered[i] > filtered[i+1] && filtered[i] > filtered[i+2] &&
+                filtered[i] > 0) {
+                peaks.push(i);
+            }
+        }
+        
+        if (peaks.length < 3) return this.lastHR;
+        
+        // Calculate intervals
+        const intervals = [];
+        for (let i = 1; i < peaks.length; i++) {
+            intervals.push(peaks[i] - peaks[i-1]);
+        }
+        
+        // Average interval in frames
+        const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        
+        // Convert to BPM (assuming ~30 fps)
+        const fps = 30;
+        const hr = Math.round((fps * 60) / avgInterval);
+        
+        // Sanity check
+        if (hr >= 40 && hr <= 180) {
+            // Smooth with previous reading
+            if (this.lastHR) {
+                this.lastHR = Math.round(this.lastHR * 0.7 + hr * 0.3);
+            } else {
+                this.lastHR = hr;
+            }
+            return this.lastHR;
+        }
+        
+        return this.lastHR;
+    }
 }
 
-const pose = new Pose({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+// ============================================
+// REAL BREATH DETECTOR
+// ============================================
+class BreathDetector {
+    constructor() {
+        this.buffer = [];
+        this.bufferSize = 150; // 5 seconds
+        this.lastRate = null;
+        this.isDetecting = false;
+        this.VISIBILITY_THRESHOLD = 0.5;
+    }
+    
+    checkTorsoVisible(landmarks) {
+        if (!landmarks) {
+            this.isDetecting = false;
+            return false;
+        }
+        
+        const lShoulder = landmarks[11];
+        const rShoulder = landmarks[12];
+        const lHip = landmarks[23];
+        const rHip = landmarks[24];
+        
+        const visible = lShoulder?.visibility > this.VISIBILITY_THRESHOLD &&
+                       rShoulder?.visibility > this.VISIBILITY_THRESHOLD &&
+                       lHip?.visibility > this.VISIBILITY_THRESHOLD &&
+                       rHip?.visibility > this.VISIBILITY_THRESHOLD;
+        
+        this.isDetecting = visible;
+        return visible;
+    }
+    
+    processFrame(landmarks) {
+        if (!this.checkTorsoVisible(landmarks)) {
+            return null;
+        }
+        
+        const lShoulder = landmarks[11];
+        const rShoulder = landmarks[12];
+        const lHip = landmarks[23];
+        const rHip = landmarks[24];
+        
+        // Calculate chest/torso metrics
+        const shoulderY = (lShoulder.y + rShoulder.y) / 2;
+        const hipY = (lHip.y + rHip.y) / 2;
+        const torsoLength = hipY - shoulderY;
+        const chestWidth = Math.abs(rShoulder.x - lShoulder.x);
+        
+        // Combine signals
+        const signal = shoulderY * 0.3 + torsoLength * 0.4 + chestWidth * 0.3;
+        
+        this.buffer.push({
+            value: signal,
+            timestamp: Date.now()
+        });
+        
+        if (this.buffer.length > this.bufferSize) {
+            this.buffer.shift();
+        }
+        
+        if (this.buffer.length >= 90) {
+            return this.calculateBreathRate();
+        }
+        
+        return null;
+    }
+    
+    calculateBreathRate() {
+        const values = this.buffer.map(b => b.value);
+        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+        const detrended = values.map(v => v - mean);
+        
+        // Smooth
+        const smoothed = [];
+        const window = 5;
+        for (let i = window; i < detrended.length - window; i++) {
+            const avg = detrended.slice(i - window, i + window).reduce((a, b) => a + b, 0) / (window * 2);
+            smoothed.push(avg);
+        }
+        
+        // Find peaks
+        const peaks = [];
+        for (let i = 3; i < smoothed.length - 3; i++) {
+            if (smoothed[i] > smoothed[i-1] && smoothed[i] > smoothed[i-2] && smoothed[i] > smoothed[i-3] &&
+                smoothed[i] > smoothed[i+1] && smoothed[i] > smoothed[i+2] && smoothed[i] > smoothed[i+3]) {
+                peaks.push(i);
+            }
+        }
+        
+        if (peaks.length < 2) return this.lastRate;
+        
+        const intervals = [];
+        for (let i = 1; i < peaks.length; i++) {
+            intervals.push(peaks[i] - peaks[i-1]);
+        }
+        
+        const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        const fps = 30;
+        const rate = Math.round((fps * 60) / avgInterval);
+        
+        if (rate >= 4 && rate <= 30) {
+            this.lastRate = rate;
+            return rate;
+        }
+        
+        return this.lastRate;
+    }
+    
+    getPhase() {
+        if (this.buffer.length < 10) return 'unknown';
+        
+        const recent = this.buffer.slice(-10).map(b => b.value);
+        const first = recent.slice(0, 5).reduce((a, b) => a + b, 0) / 5;
+        const last = recent.slice(-5).reduce((a, b) => a + b, 0) / 5;
+        
+        if (last > first + 0.001) return 'inhale';
+        if (last < first - 0.001) return 'exhale';
+        return 'hold';
+    }
+}
+
+// ============================================
+// CYP YOGA SEQUENCE DATA
+// ============================================
+const CYP_SEQUENCE = [
+    {
+        id: 'prayer',
+        name: 'Opening Prayer',
+        sanskrit: 'Prārthana',
+        duration: 30,
+        instructions: 'Begin with a prayer to create a conducive environment for practice. Sit comfortably with eyes closed.',
+        voiceText: 'Let us begin with the opening prayer. Sit comfortably. Close your eyes. Take a deep breath and center yourself.',
+        contraindication: null,
+        poseType: 'seated'
+    },
+    {
+        id: 'neck_movement',
+        name: 'Neck Movements',
+        sanskrit: 'Grīvā Cālana',
+        duration: 60,
+        instructions: 'Slowly move head forward and backward, then side to side, then rotate gently.',
+        voiceText: 'Now we begin neck movements. Keep your spine straight. Slowly move your head forward, trying to touch chin to chest. Then gently take head back. Repeat twice.',
+        contraindication: 'Avoid if you have cervical spondylitis or high blood pressure.',
+        poseType: 'standing'
+    },
+    {
+        id: 'trunk_twisting',
+        name: 'Trunk Twisting',
+        sanskrit: 'Kaṭi Śakti Vikāsaka',
+        duration: 45,
+        instructions: 'Keep feet apart. Raise arms to chest level. Twist trunk left and right.',
+        voiceText: 'Trunk twisting. Keep your feet two to three feet apart. Raise both arms to chest level, palms facing each other. Now twist your body to the left, then to the right. Keep your hips stable.',
+        contraindication: 'Avoid in case of severe back pain or disc disorders.',
+        poseType: 'standing'
+    },
+    {
+        id: 'tadasana',
+        name: 'Palm Tree Pose',
+        sanskrit: 'Tādāsana',
+        duration: 30,
+        instructions: 'Stand with feet together. Interlock fingers, turn wrists outward. Raise arms above head while inhaling. Rise on toes.',
+        voiceText: 'Tadasana, the palm tree pose. Stand with feet two inches apart. Interlock your fingers. Turn wrists outward. Now inhale, raise your arms above your head. Rise onto your toes. Hold for ten to fifteen seconds.',
+        contraindication: 'Avoid lifting toes if you have acute cardiac problems, varicose veins, or vertigo.',
+        poseType: 'standing',
+        analyzerId: 'tadasana'
+    },
+    {
+        id: 'vrikshasana',
+        name: 'Tree Pose',
+        sanskrit: 'Vṛkṣāsana',
+        duration: 30,
+        instructions: 'Stand on one leg. Place other foot on inner thigh (NOT on knee). Raise arms above head with palms together.',
+        voiceText: 'Vrikshasana, the tree pose. Stand tall. Focus on a point in front. Bend your right leg and place the foot on the inner left thigh. Never place foot on the knee joint. Raise arms and join palms above head.',
+        contraindication: 'Avoid in case of arthritis, vertigo, or obesity. NEVER place foot on knee joint.',
+        poseType: 'standing',
+        analyzerId: 'vrikshasana'
+    },
+    {
+        id: 'padahastasana',
+        name: 'Hands to Feet Pose',
+        sanskrit: 'Pāda-Hastāsana',
+        duration: 30,
+        instructions: 'Inhale, raise arms. Exhale, bend forward from hips. Try to touch palms to floor beside feet.',
+        voiceText: 'Pada Hastasana, hands to feet pose. Inhale and raise your arms up. Now exhale and bend forward from your hips. Keep your legs straight. Try to place your palms on the floor beside your feet.',
+        contraindication: 'Avoid in case of back problems, abdominal inflammation, hernia, high myopia, or vertigo.',
+        poseType: 'standing',
+        analyzerId: 'padahastasana'
+    },
+    {
+        id: 'ardhachakrasana',
+        name: 'Half Wheel Pose',
+        sanskrit: 'Ardha Cakrāsana',
+        duration: 25,
+        instructions: 'Support lower back with hands. Drop head back. Inhale and bend backward gently.',
+        voiceText: 'Ardha Chakrasana, the half wheel pose. Place your hands on your lower back for support, fingers pointing downward. Drop your head back gently. Now inhale and bend backward. Keep your thighs strong.',
+        contraindication: 'Avoid if you have vertigo or tendency to giddiness. Hypertensive patients should bend with care.',
+        poseType: 'standing',
+        analyzerId: 'ardhachakrasana'
+    },
+    {
+        id: 'trikonasana',
+        name: 'Triangle Pose',
+        sanskrit: 'Trikoṇāsana',
+        duration: 30,
+        instructions: 'Stand with feet wide apart. Raise arms sideways. Bend to one side, place hand behind foot, other arm straight up.',
+        voiceText: 'Trikonasana, the triangle pose. Stand with feet comfortably apart. Raise both arms sideways to shoulder level. Now exhale and bend to the right side. Place right hand behind right foot. Left arm points straight up. Look at your left hand.',
+        contraindication: 'Avoid in case of slipped disc or sciatica. Do not overstretch.',
+        poseType: 'standing',
+        analyzerId: 'trikonasana'
+    },
+    {
+        id: 'bhadrasana',
+        name: 'Gracious Pose',
+        sanskrit: 'Bhadrāsana',
+        duration: 40,
+        instructions: 'Sit with soles of feet together. Hold toes, bring heels close to body. Keep spine erect.',
+        voiceText: 'Bhadrasana, the gracious pose. Sit with legs stretched out. Now bring the soles of your feet together. Hold your toes. Pull heels as close to your body as comfortable. Keep your spine erect.',
+        contraindication: 'Avoid in case of severe arthritis or sciatica.',
+        poseType: 'seated'
+    },
+    {
+        id: 'vajrasana',
+        name: 'Thunderbolt Pose',
+        sanskrit: 'Vajrāsana',
+        duration: 30,
+        instructions: 'Kneel and sit back on heels. Keep thighs together, spine erect. This is the base for many seated practices.',
+        voiceText: 'Vajrasana, the thunderbolt pose. Kneel down and sit back on your heels. Keep your thighs together. Spine straight. Hands on knees. This pose aids digestion.',
+        contraindication: 'Avoid if you have knee problems or acute arthritis of the knees.',
+        poseType: 'seated'
+    },
+    {
+        id: 'bhujangasana',
+        name: 'Cobra Pose',
+        sanskrit: 'Bhujangāsana',
+        duration: 25,
+        instructions: 'Lie on stomach. Place palms beside chest. Inhale and lift chest, keeping navel on ground. Look slightly upward.',
+        voiceText: 'Bhujangasana, the cobra pose. Lie on your stomach. Place palms beside your chest. Elbows close to body. Now inhale and slowly lift your chin and chest. Keep your navel on the ground. Look slightly upward.',
+        contraindication: 'Avoid after abdominal surgery or if you have hernia or ulcers.',
+        poseType: 'prone',
+        analyzerId: 'bhujangasana'
+    },
+    {
+        id: 'shalabhasana',
+        name: 'Locust Pose',
+        sanskrit: 'Śalabhāsana',
+        duration: 20,
+        instructions: 'Lie on stomach. Keep chin on floor, arms beside body. Inhale and raise both legs without bending knees.',
+        voiceText: 'Shalabhasana, the locust pose. Lie on your stomach. Chin on the floor. Arms beside your body, palms facing up. Now inhale and raise both legs off the floor. Keep knees straight. Hold for ten to twenty seconds.',
+        contraindication: 'Avoid if you have cardiac problems, high blood pressure, peptic ulcers, or hernia.',
+        poseType: 'prone',
+        analyzerId: 'shalabhasana'
+    },
+    {
+        id: 'makarasana',
+        name: 'Crocodile Pose',
+        sanskrit: 'Makarāsana',
+        duration: 45,
+        instructions: 'Lie on stomach with feet apart. Rest head on folded arms. Relax completely.',
+        voiceText: 'Makarasana, the crocodile pose for relaxation. Lie on your stomach. Feet wide apart, pointing outward. Fold your arms and rest your forehead on them. Close your eyes. Breathe slowly and deeply. Relax your lower back.',
+        contraindication: 'Avoid in case of pregnancy or severe low blood pressure.',
+        poseType: 'prone'
+    },
+    {
+        id: 'setubandasana',
+        name: 'Bridge Pose',
+        sanskrit: 'Śetubandhāsana',
+        duration: 25,
+        instructions: 'Lie on back. Bend knees, feet flat on floor near hips. Inhale and lift hips toward ceiling.',
+        voiceText: 'Setu Bandhasana, the bridge pose. Lie on your back. Bend both knees. Bring heels near your buttocks. Hold your ankles. Now inhale and lift your hips up as high as comfortable. Keep shoulders on the ground.',
+        contraindication: 'Avoid if you have ulcers, hernia, or are in advanced pregnancy.',
+        poseType: 'supine',
+        analyzerId: 'setubandasana'
+    },
+    {
+        id: 'pavanamuktasana',
+        name: 'Wind Releasing Pose',
+        sanskrit: 'Pavanamuktāsana',
+        duration: 30,
+        instructions: 'Lie on back. Bring both knees to chest. Clasp hands around shins. Exhale and lift head toward knees.',
+        voiceText: 'Pavanamuktasana, the wind releasing pose. Lie on your back. Bend both knees and bring thighs to your chest. Interlock fingers around your shins. Now exhale and lift your head, trying to touch your chin to your knees.',
+        contraindication: 'Avoid in case of abdominal injuries, hernia, sciatica, or pregnancy.',
+        poseType: 'supine'
+    },
+    {
+        id: 'shavasana',
+        name: 'Corpse Pose',
+        sanskrit: 'Śavāsana',
+        duration: 60,
+        instructions: 'Lie flat on back. Arms beside body, palms up. Feet apart. Close eyes. Relax every part of body.',
+        voiceText: 'Shavasana, the corpse pose for deep relaxation. Lie on your back. Arms beside your body, palms facing up. Feet comfortably apart. Close your eyes. Relax your whole body. Let go of all tension. Breathe naturally.',
+        contraindication: null,
+        poseType: 'supine'
+    },
+    {
+        id: 'kapalabhati',
+        name: 'Skull Shining Breath',
+        sanskrit: 'Kapālabhāti',
+        duration: 90,
+        instructions: 'Sit comfortably. Exhale forcefully through nose by contracting abdomen. Inhalation is passive. 30 breaths per round, 3 rounds.',
+        voiceText: 'Kapalabhati, skull shining breath. Sit in a comfortable position. Close your eyes. Inhale deeply. Now exhale forcefully through your nose by contracting your abdominal muscles. Inhalation happens automatically. Continue for thirty rapid breaths. Then breathe normally. Repeat three rounds.',
+        contraindication: 'Avoid in case of cardiac conditions, high blood pressure, vertigo, epilepsy, hernia, or gastric ulcers.',
+        poseType: 'seated'
+    },
+    {
+        id: 'anuloma_viloma',
+        name: 'Alternate Nostril Breathing',
+        sanskrit: 'Anuloma Viloma Prāṇāyāma',
+        duration: 120,
+        instructions: 'Sit comfortably. Close right nostril with thumb, inhale through left. Close left with ring finger, exhale through right. Inhale right, exhale left. This is one round.',
+        voiceText: 'Anuloma Viloma, alternate nostril breathing. Sit comfortably with spine erect. Close your right nostril with your thumb. Inhale slowly through your left nostril. Now close left nostril with ring finger. Release thumb and exhale through right nostril. Inhale through right. Close right and exhale through left. This is one round. Continue for five rounds.',
+        contraindication: null,
+        poseType: 'seated'
+    },
+    {
+        id: 'bhramari',
+        name: 'Bee Breath',
+        sanskrit: 'Bhrāmarī Prāṇāyāma',
+        duration: 60,
+        instructions: 'Sit comfortably. Close ears with thumbs, eyes with fingers. Inhale deeply. Exhale making a humming sound like a bee.',
+        voiceText: 'Bhramari, the bee breath. Sit comfortably. Close your ears with your thumbs. Place fingers over closed eyes. Inhale deeply through your nose. Now exhale slowly while making a deep, steady humming sound like a bee. Feel the vibration in your head. Repeat five times.',
+        contraindication: 'Avoid in case of ear or nose infections.',
+        poseType: 'seated'
+    },
+    {
+        id: 'dhyana',
+        name: 'Meditation',
+        sanskrit: 'Dhyāna',
+        duration: 120,
+        instructions: 'Sit comfortably with spine erect. Close eyes with slightly upturned face. Focus gently between eyebrows. Let thoughts dissolve.',
+        voiceText: 'Dhyana, meditation. Sit in any comfortable posture. Spine comfortably erect. Hands in Jnana mudra on your knees. Close your eyes. Turn your face slightly upward. Focus gently between your eyebrows. Let your breath become slow and natural. Let your thoughts dissolve. Simply be aware. Stay as long as you wish.',
+        contraindication: null,
+        poseType: 'seated'
+    },
+    {
+        id: 'shanti_patha',
+        name: 'Peace Chant',
+        sanskrit: 'Śānti Pāṭha',
+        duration: 30,
+        instructions: 'Chant the closing prayer: Om Sarve Bhavantu Sukhinah, Sarve Santu Niramayah. Om Shanti Shanti Shantih.',
+        voiceText: 'Let us close with the peace chant. Om. Sarve Bhavantu Sukhinah. Sarve Santu Niramayah. May all be happy. May all be free from illness. Om Shanti, Shanti, Shantih. Peace, peace, peace.',
+        contraindication: null,
+        poseType: 'seated'
+    }
+];
+
+// ============================================
+// MAIN APPLICATION
+// ============================================
+class YogaApp {
+    constructor() {
+        this.pose = null;
+        this.camera = null;
+        this.voiceGuide = new VoiceGuide();
+        this.poseAnalyzer = new PoseAnalyzer();
+        this.heartRateDetector = new HeartRateDetector();
+        this.breathDetector = new BreathDetector();
+        
+        this.currentPoseIndex = 0;
+        this.isRunning = false;
+        this.timer = null;
+        this.timeRemaining = 0;
+        
+        this.lastFeedbackTime = 0;
+        this.stabilityBuffer = [];
+        
+        this.initElements();
+        this.initEventListeners();
+        this.initPoseDetection();
+    }
+    
+    initElements() {
+        this.video = document.getElementById('videoElement');
+        this.canvas = document.getElementById('canvasElement');
+        this.ctx = this.canvas.getContext('2d');
+        
+        this.detectionStatus = document.getElementById('detectionStatus');
+        this.detectionText = document.getElementById('detectionText');
+        this.scoreCircle = document.getElementById('scoreCircle');
+        this.scoreValue = document.getElementById('scoreValue');
+        this.feedbackToast = document.getElementById('feedbackToast');
+        
+        this.poseName = document.getElementById('poseName');
+        this.poseSanskrit = document.getElementById('poseSanskrit');
+        this.instructions = document.getElementById('instructions');
+        this.contraindication = document.getElementById('contraindication');
+        this.timerProgress = document.getElementById('timerProgress');
+        
+        this.heartRateEl = document.getElementById('heartRate');
+        this.breathRateEl = document.getElementById('breathRate');
+        this.stabilityEl = document.getElementById('stability');
+        this.holdTimeEl = document.getElementById('holdTime');
+        
+        this.hrCard = document.getElementById('hrCard');
+        this.brCard = document.getElementById('brCard');
+        this.stabilityCard = document.getElementById('stabilityCard');
+        
+        this.sessionProgress = document.getElementById('sessionProgress');
+        this.progressText = document.getElementById('progressText');
+    }
+    
+    initEventListeners() {
+        document.getElementById('startBtn').addEventListener('click', () => this.start());
+        document.getElementById('voiceToggle').addEventListener('click', () => this.toggleVoice());
+    }
+    
+    async initPoseDetection() {
+        this.pose = new Pose({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`
+        });
+        
+        this.pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6
+        });
+        
+        this.pose.onResults((results) => this.onPoseResults(results));
+        
+        await this.pose.initialize();
+        document.getElementById('loadingOverlay').classList.add('hidden');
+    }
+    
+    async start() {
+        document.getElementById('startScreen').classList.add('hidden');
+        
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 1280, height: 720, facingMode: 'user' }
+            });
+            
+            this.video.srcObject = stream;
+            await this.video.play();
+            
+            this.canvas.width = this.video.videoWidth;
+            this.canvas.height = this.video.videoHeight;
+            
+            this.isRunning = true;
+            this.processFrame();
+            
+            // Welcome message
+            setTimeout(() => {
+                this.voiceGuide.speak('Welcome to AI Yoga Instructor. We will practice the Common Yoga Protocol. Stand in view of the camera when you are ready.', true);
+            }, 1000);
+            
+            // Start first pose after welcome
+            setTimeout(() => {
+                this.loadPose(0);
+            }, 6000);
+            
+        } catch (error) {
+            console.error('Camera error:', error);
+            alert('Camera access required. Please allow camera permission and refresh.');
+        }
+    }
+    
+    async processFrame() {
+        if (!this.isRunning) return;
+        
+        await this.pose.send({ image: this.video });
+        requestAnimationFrame(() => this.processFrame());
+    }
+    
+    onPoseResults(results) {
+        // Draw video and skeleton
+        this.ctx.save();
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.drawImage(results.image, 0, 0);
+        
+        const landmarks = results.poseLandmarks;
+        
+        // Update detection status
+        const personDetected = this.poseAnalyzer.checkPersonDetected(landmarks);
+        this.updateDetectionStatus(personDetected);
+        
+        if (landmarks && personDetected) {
+            // Draw skeleton
+            drawConnectors(this.ctx, landmarks, POSE_CONNECTIONS, { color: '#00FF88', lineWidth: 3 });
+            drawLandmarks(this.ctx, landmarks, { color: '#00D9FF', lineWidth: 2, radius: 5 });
+            
+            // Analyze current pose
+            const currentPose = CYP_SEQUENCE[this.currentPoseIndex];
+            const analysis = this.poseAnalyzer.analyzePose(landmarks, currentPose.analyzerId);
+            
+            this.updateScore(analysis);
+            this.updateVitals(landmarks);
+            this.updateStability(landmarks);
+            
+            // Show feedback
+            if (analysis.isValid && Date.now() - this.lastFeedbackTime > 5000) {
+                this.showFeedback(analysis.feedback, analysis.isSafety);
+                if (analysis.isSafety) {
+                    this.voiceGuide.speak(analysis.feedback, true);
+                }
+                this.lastFeedbackTime = Date.now();
+            }
+        } else {
+            // No person detected - show appropriate state
+            this.updateScore({ score: 0, isValid: false });
+            this.clearVitals();
+        }
+        
+        this.ctx.restore();
+    }
+    
+    updateDetectionStatus(detected) {
+        if (detected) {
+            this.detectionStatus.classList.remove('not-detected');
+            this.detectionStatus.classList.add('detected');
+            this.detectionText.textContent = 'Person Detected ✓';
+        } else {
+            this.detectionStatus.classList.remove('detected');
+            this.detectionStatus.classList.add('not-detected');
+            this.detectionText.textContent = 'No Person Detected';
+        }
+    }
+    
+    updateScore(analysis) {
+        if (!analysis.isValid) {
+            this.scoreCircle.classList.add('no-detection');
+            this.scoreValue.textContent = '--';
+            this.scoreCircle.style.background = 'rgba(100,100,100,0.5)';
+            return;
+        }
+        
+        this.scoreCircle.classList.remove('no-detection');
+        const score = Math.round(analysis.score);
+        this.scoreValue.textContent = score;
+        
+        const angle = (score / 100) * 360;
+        const color = score >= 70 ? '#00ff88' : score >= 50 ? '#ffcc00' : '#ff4444';
+        this.scoreCircle.style.background = `conic-gradient(${color} ${angle}deg, rgba(255,255,255,0.1) ${angle}deg)`;
+        this.scoreValue.style.color = color;
+    }
+    
+    updateVitals(landmarks) {
+        // Heart Rate (rPPG)
+        const hr = this.heartRateDetector.processFrame(this.video, landmarks);
+        if (this.heartRateDetector.isDetecting) {
+            this.hrCard.classList.remove('no-data');
+            this.heartRateEl.textContent = hr ? `${hr}` : 'Detecting...';
+        } else {
+            this.hrCard.classList.add('no-data');
+            this.heartRateEl.textContent = '--';
+        }
+        
+        // Breath Rate
+        const br = this.breathDetector.processFrame(landmarks);
+        if (this.breathDetector.isDetecting) {
+            this.brCard.classList.remove('no-data');
+            this.breathRateEl.textContent = br ? `${br}` : 'Detecting...';
+        } else {
+            this.brCard.classList.add('no-data');
+            this.breathRateEl.textContent = '--';
+        }
+    }
+    
+    updateStability(landmarks) {
+        if (!landmarks) return;
+        
+        const hip = landmarks[23];
+        if (!hip || hip.visibility < 0.5) {
+            this.stabilityCard.classList.add('no-data');
+            this.stabilityEl.textContent = '--';
+            return;
+        }
+        
+        this.stabilityBuffer.push({ x: hip.x, y: hip.y });
+        if (this.stabilityBuffer.length > 30) this.stabilityBuffer.shift();
+        
+        if (this.stabilityBuffer.length >= 15) {
+            const xVals = this.stabilityBuffer.map(p => p.x);
+            const yVals = this.stabilityBuffer.map(p => p.y);
+            
+            const xVar = this.variance(xVals);
+            const yVar = this.variance(yVals);
+            const totalVar = xVar + yVar;
+            
+            this.stabilityCard.classList.remove('no-data');
+            
+            if (totalVar < 0.0002) {
+                this.stabilityEl.textContent = 'Excellent';
+                this.stabilityEl.style.color = '#00ff88';
+            } else if (totalVar < 0.0005) {
+                this.stabilityEl.textContent = 'Good';
+                this.stabilityEl.style.color = '#00d9ff';
+            } else if (totalVar < 0.001) {
+                this.stabilityEl.textContent = 'Fair';
+                this.stabilityEl.style.color = '#ffcc00';
+            } else {
+                this.stabilityEl.textContent = 'Unstable';
+                this.stabilityEl.style.color = '#ff4444';
+            }
+        }
+    }
+    
+    variance(arr) {
+        const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+        return arr.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / arr.length;
+    }
+    
+    clearVitals() {
+        this.hrCard.classList.add('no-data');
+        this.brCard.classList.add('no-data');
+        this.stabilityCard.classList.add('no-data');
+        
+        this.heartRateEl.textContent = '--';
+        this.breathRateEl.textContent = '--';
+        this.stabilityEl.textContent = '--';
+    }
+    
+    showFeedback(text, isSafety = false) {
+        this.feedbackToast.textContent = text;
+        this.feedbackToast.classList.toggle('safety', isSafety);
+        this.feedbackToast.classList.add('visible');
+        
+        setTimeout(() => {
+            this.feedbackToast.classList.remove('visible');
+        }, 4000);
+    }
+    
+    loadPose(index) {
+        if (index >= CYP_SEQUENCE.length) {
+            this.completePractice();
+            return;
+        }
+        
+        this.currentPoseIndex = index;
+        const pose = CYP_SEQUENCE[index];
+        
+        // Update UI
+        this.poseName.textContent = pose.name;
+        this.poseSanskrit.textContent = pose.sanskrit;
+        this.instructions.textContent = pose.instructions;
+        
+        if (pose.contraindication) {
+            this.contraindication.style.display = 'block';
+            this.contraindication.textContent = '⚠️ ' + pose.contraindication;
+        } else {
+            this.contraindication.style.display = 'none';
+        }
+        
+        // Update progress
+        this.sessionProgress.style.width = `${((index + 1) / CYP_SEQUENCE.length) * 100}%`;
+        this.progressText.textContent = `Practice ${index + 1} of ${CYP_SEQUENCE.length}`;
+        
+        // Voice announcement
+        this.voiceGuide.speak(pose.voiceText, true);
+        
+        // Speak contraindication after main instruction
+        if (pose.contraindication) {
+            setTimeout(() => {
+                this.voiceGuide.speak('Please note: ' + pose.contraindication);
+            }, 8000);
+        }
+        
+        // Start timer
+        this.startTimer(pose.duration);
+        
+        // Reset stability buffer
+        this.stabilityBuffer = [];
+    }
+    
+    startTimer(duration) {
+        this.timeRemaining = duration;
+        this.timerProgress.style.width = '100%';
+        this.holdTimeEl.textContent = `${duration}s`;
+        
+        if (this.timer) clearInterval(this.timer);
+        
+        this.timer = setInterval(() => {
+            this.timeRemaining--;
+            this.holdTimeEl.textContent = `${this.timeRemaining}s`;
+            this.timerProgress.style.width = `${(this.timeRemaining / duration) * 100}%`;
+            
+            // Voice countdown
+            if (this.timeRemaining === 10) {
+                this.voiceGuide.speak('Ten seconds remaining');
+            } else if (this.timeRemaining === 5) {
+                this.voiceGuide.speak('Five seconds');
+            }
+            
+            if (this.timeRemaining <= 0) {
+                clearInterval(this.timer);
+                this.loadPose(this.currentPoseIndex + 1);
+            }
+        }, 1000);
+    }
+    
+    completePractice() {
+        this.voiceGuide.speak('Congratulations! You have completed the Common Yoga Protocol practice. Om Shanti Shanti Shanti. May peace be with you. Namaste.', true);
+        
+        this.poseName.textContent = 'Practice Complete! 🙏';
+        this.poseSanskrit.textContent = 'Namaste';
+        this.instructions.textContent = 'Wonderful practice! The Common Yoga Protocol session is complete. May you carry this peace with you throughout your day.';
+        this.contraindication.style.display = 'none';
+        this.timerProgress.style.width = '0%';
+        this.sessionProgress.style.width = '100%';
+        this.progressText.textContent = 'Session Complete!';
+    }
+    
+    toggleVoice() {
+        const enabled = this.voiceGuide.toggle();
+        const btn = document.getElementById('voiceToggle');
+        btn.textContent = enabled ? '🔊 Voice ON' : '🔇 Voice OFF';
+        btn.classList.toggle('off', !enabled);
+    }
+}
+
+// Initialize when DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+    window.app = new YogaApp();
 });
-
-pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5 });
-pose.onResults(onResults);
-
-const camera = new Camera(videoElement, {
-    onFrame: async () => { await pose.send({image: videoElement}); },
-    width: 1280, height: 720
-});
-
-startBtn.onclick = () => {
-    startBtn.style.display = 'none';
-    camera.start(); // Start camera after click
-    runSession();   // Start audio after click
-};
 </script>
 </body>
 </html>
